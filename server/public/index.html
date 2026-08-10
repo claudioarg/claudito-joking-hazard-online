@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#1a1a2e" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Joking Hazard" />
+  <title>Joking Hazard</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- SCREEN: HOME -->
+<div id="screen-home" class="screen active">
+  <div class="home-container">
+    <h1 class="logo">🃏 Joking Hazard</h1>
+    <p class="subtitle">Juego de cómics desopilantes</p>
+    <input type="text" id="player-name" placeholder="Tu nombre" maxlength="20" />
+    <div class="home-buttons">
+      <button class="btn btn-primary" id="btn-create">Crear sala</button>
+      <button class="btn btn-secondary" id="btn-join-open">Unirme a sala</button>
+    </div>
+    <p class="home-credit">By Claudito ;)</p>
+  </div>
+</div>
+
+<!-- SCREEN: JOIN -->
+<div id="screen-join" class="screen">
+  <div class="home-container">
+    <h2>Unirse a sala</h2>
+    <div id="join-room-display" class="room-code-badge hidden"></div>
+    <input type="text" id="join-room-code" class="join-room-code-input" placeholder="Código de sala (ej: XKCD2)" maxlength="6" />
+    <input type="text" id="join-player-name" placeholder="Tu nombre" maxlength="20" />
+    <div class="home-buttons">
+      <button class="btn btn-primary" id="btn-join-confirm">Unirme</button>
+      <button class="btn btn-ghost" id="btn-back-home">← Volver</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: LOBBY -->
+<div id="screen-lobby" class="screen">
+  <div class="lobby-container">
+    <div class="lobby-header">
+      <h2>Sala: <span id="lobby-room-id"></span></h2>
+      <p class="lobby-hint">Mostrá el QR a tus amigos para que se unan</p>
+    </div>
+    <div class="qr-box">
+      <img id="qr-image" src="" alt="QR code" />
+      <p id="join-url" class="join-url"></p>
+    </div>
+    <div class="player-list" id="lobby-players"></div>
+    <div class="lobby-settings" id="lobby-settings-host">
+      <label>Puntos para ganar:
+        <select id="target-score-select">
+          <option value="3">3 puntos</option>
+          <option value="5">5 puntos</option>
+          <option value="7">7 puntos</option>
+          <option value="10">10 puntos</option>
+        </select>
+      </label>
+    </div>
+    <button class="btn btn-primary" id="btn-start-game">▶ Iniciar juego</button>
+    <p id="lobby-waiting-msg" class="muted"></p>
+  </div>
+</div>
+
+<!-- SCREEN: GAME -->
+<div id="screen-game" class="screen">
+  <div class="game-layout" id="game-layout">
+
+    <!-- Top bar: scores -->
+    <div class="score-top">
+      <div class="score-bar" id="score-bar"></div>
+    </div>
+
+    <!-- Status message -->
+    <div class="status-bar" id="status-bar">Esperando...</div>
+    <div class="host-controls" id="host-controls">
+      <button class="btn btn-secondary hidden" id="btn-change-initial-card">Cambiar carta</button>
+      <button class="btn btn-secondary hidden" id="btn-terminate-match">Terminar partida</button>
+    </div>
+    <div class="pause-banner hidden" id="pause-banner">
+      <div class="pause-text" id="pause-text">La partida está en pausa hasta que todos vuelvan.</div>
+      <button class="btn btn-secondary" id="btn-retry-sync">Reintentar conexion</button>
+    </div>
+
+    <!-- Table: cards in play -->
+    <div class="table-area" id="table-area">
+      <div class="table-header">
+        <div class="table-label">Mesa</div>
+      </div>
+      <div class="table-cards" id="table-cards"></div>
+    </div>
+
+    <!-- JUGADAS: always visible once round starts -->
+    <div class="submissions-area hidden" id="submissions-area">
+      <div class="table-label" id="submissions-label">Jugadas</div>
+      <div class="submissions-list" id="submissions-list"></div>
+    </div>
+
+    <!-- Hand -->
+    <div class="hand-area" id="hand-area">
+      <div class="hand-label" id="hand-label">Tu mano</div>
+      <div class="hand-cards" id="hand-cards"></div>
+      <div class="hand-actions-shell" id="hand-actions-shell">
+        <div class="hand-actions-sticky" id="hand-actions-sticky">
+          <div class="deck-swap-panel hidden" id="deck-swap-panel">
+            <div class="deck-swap-text">MAZO: descartá entre 1 y 3 cartas para recibir esa misma cantidad.</div>
+            <button class="btn btn-primary" id="btn-confirm-swap" disabled>Descartar y Robar</button>
+          </div>
+          <div class="confirm-bar hidden" id="confirm-bar">
+            <span id="confirm-preview"></span>
+            <button class="btn btn-primary" id="btn-confirm-play">Confirmar ✔</button>
+            <button class="btn btn-ghost" id="btn-cancel-play">Cancelar</button>
+          </div>
+          <div class="red-slot-chooser hidden" id="red-slot-chooser">
+            <span class="red-slot-label">Ubicar carta seleccionada en:</span>
+            <button class="btn btn-primary" id="btn-red-slot-1">Pos 1</button>
+            <button class="btn btn-primary" id="btn-red-slot-2">Pos 2</button>
+            <button class="btn btn-ghost" id="btn-red-slot-cancel">Cancelar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Judge card placement (normal round) -->
+    <div class="judge-placement hidden" id="judge-placement">
+      <div class="placement-hint">Arrastrá una carta de tu mano al recuadro blanco de MESA (posición 1, 2 o 3).</div>
+      <div class="placement-controls">
+        <div class="placement-row">
+          <span class="placement-label">Primera carta:</span>
+          <button class="btn btn-secondary" id="btn-deck-slot-1">Pos 1</button>
+          <button class="btn btn-secondary" id="btn-deck-slot-2">Pos 2</button>
+          <button class="btn btn-secondary" id="btn-deck-slot-3">Pos 3</button>
+        </div>
+        <div class="placement-row">
+          <span class="placement-label">Tu carta:</span>
+          <button class="btn btn-primary" id="btn-judge-slot-1">Pos 1</button>
+          <button class="btn btn-primary" id="btn-judge-slot-2">Pos 2</button>
+          <button class="btn btn-primary" id="btn-judge-slot-3">Pos 3</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- SCREEN: ROUND RESULT -->
+<div id="screen-result" class="screen">
+  <div class="result-container">
+    <h2 id="result-title"></h2>
+    <div class="result-story" id="result-story"></div>
+    <div class="result-scores" id="result-scores"></div>
+
+    <button class="btn btn-primary hidden" id="btn-next-round">Siguiente ronda →</button>
+    <p id="result-waiting" class="muted">Esperando al host...</p>
+  </div>
+</div>
+
+<!-- SCREEN: GAME OVER -->
+<div id="screen-gameover" class="screen">
+  <div class="home-container">
+    <h1>🏆</h1>
+    <h2 id="gameover-winner"></h2>
+    <div class="result-scores" id="gameover-scores"></div>
+    <button class="btn btn-primary" id="btn-play-again">Jugar de nuevo</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast" class="toast"></div>
+
+<script src="vendor/socket.io.min.js?v=20260610a"></script>
+<script src="game.js?v=20260809g"></script>
+<script src="pwa-register.js?v=20260809a"></script>
+</body>
+</html>

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<title>Marcador de cartas</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #1a1a2e; color: #eaeaea; font-family: monospace; display: flex; flex-direction: column; align-items: center; padding: 20px; gap: 16px; }
+  h2 { color: #e94560; }
+  #instructions { background: #16213e; padding: 12px 20px; border-radius: 8px; font-size: .9rem; line-height: 1.7; max-width: 900px; width: 100%; }
+  #instructions b { color: #f5a623; }
+  #canvas-wrapper { position: relative; cursor: crosshair; }
+  canvas { display: block; max-width: 100%; }
+  #output { background: #16213e; padding: 12px 20px; border-radius: 8px; font-size: .85rem; max-width: 900px; width: 100%; white-space: pre-wrap; }
+  #output b { color: #2ecc71; }
+  button { background: #e94560; color: #fff; border: none; padding: 10px 22px; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 700; }
+  button:hover { opacity: .85; }
+  #clicks-info { color: #f5a623; font-size: .85rem; }
+</style>
+</head>
+<body>
+
+<h2>Marcador de grilla de cartas</h2>
+
+<div id="instructions">
+  <b>Instrucciones:</b><br>
+  1. Cargá la imagen de la primera página (page1_reference.png)<br>
+  2. Hacé clic en la <b>esquina superior-izquierda de la carta 1</b> (arriba-izquierda de toda la grilla)<br>
+  3. Hacé clic en la <b>esquina inferior-derecha de la carta 9</b> (abajo-derecha de toda la grilla)<br>
+  4. Si las 9 cartas tienen espacios distintos, también podés marcar la esquina de cada carta (18 clics = 9 cartas × 2 esquinas)<br>
+  5. Copiá el resultado y pegáselo en el chat
+</div>
+
+<input type="file" id="file-input" accept="image/*" />
+
+<div id="canvas-wrapper">
+  <canvas id="canvas"></canvas>
+</div>
+
+<p id="clicks-info">Clics registrados: 0</p>
+<button id="btn-reset">Resetear</button>
+<button id="btn-copy">Copiar resultado</button>
+
+<div id="output">Esperando imagen...</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const output = document.getElementById('output');
+const clicksInfo = document.getElementById('clicks-info');
+
+let img = null;
+let scale = 1;
+let clicks = [];
+
+document.getElementById('file-input').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const image = new Image();
+    image.onload = () => {
+      img = image;
+      // Scale to fit screen
+      const maxW = Math.min(window.innerWidth - 60, 1200);
+      scale = maxW / image.width;
+      canvas.width = image.width * scale;
+      canvas.height = image.height * scale;
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+      output.textContent = 'Imagen cargada. Hacé clic en las esquinas.';
+      clicks = [];
+    };
+    image.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+canvas.addEventListener('click', e => {
+  if (!img) return;
+  const rect = canvas.getBoundingClientRect();
+  const cx = (e.clientX - rect.left) / (rect.width / canvas.width);
+  const cy = (e.clientY - rect.top) / (rect.height / canvas.height);
+  // Real pixel coords in original image
+  const rx = Math.round(cx / scale);
+  const ry = Math.round(cy / scale);
+
+  clicks.push({ rx, ry });
+
+  // Draw marker
+  ctx.strokeStyle = '#e94560';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 8, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = '#e94560';
+  ctx.font = 'bold 14px monospace';
+  ctx.fillText(clicks.length, cx + 10, cy - 6);
+
+  clicksInfo.textContent = `Clics registrados: ${clicks.length}`;
+  updateOutput();
+});
+
+function updateOutput() {
+  let text = `=== COORDENADAS MARCADAS (zoom 3x) ===\n`;
+  clicks.forEach((c, i) => {
+    text += `Clic ${i + 1}: x=${c.rx}, y=${c.ry}\n`;
+  });
+
+  if (clicks.length >= 2) {
+    const xs = clicks.map(c => c.rx);
+    const ys = clicks.map(c => c.ry);
+    const x0 = Math.min(...xs), x1 = Math.max(...xs);
+    const y0 = Math.min(...ys), y1 = Math.max(...ys);
+    text += `\n=== BOUNDING BOX TOTAL ===\n`;
+    text += `x0=${x0}  y0=${y0}  x1=${x1}  y1=${y1}\n`;
+    text += `ancho total=${x1-x0}  alto total=${y1-y0}\n`;
+    text += `(zoom 3x → dividir por 3 para pts PDF)\n`;
+  }
+
+  if (clicks.length === 18) {
+    text += `\n=== CELDAS INDIVIDUALES (9 cartas) ===\n`;
+    for (let i = 0; i < 9; i++) {
+      const a = clicks[i * 2];
+      const b = clicks[i * 2 + 1];
+      text += `Carta ${i+1}: x0=${Math.min(a.rx,b.rx)} y0=${Math.min(a.ry,b.ry)} x1=${Math.max(a.rx,b.rx)} y1=${Math.max(a.ry,b.ry)}\n`;
+    }
+  }
+
+  output.innerHTML = '<b>' + text + '</b>';
+}
+
+document.getElementById('btn-reset').addEventListener('click', () => {
+  clicks = [];
+  if (img) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  }
+  clicksInfo.textContent = 'Clics registrados: 0';
+  output.textContent = 'Reseteado.';
+});
+
+document.getElementById('btn-copy').addEventListener('click', () => {
+  navigator.clipboard.writeText(output.innerText).then(() => {
+    document.getElementById('btn-copy').textContent = '✓ Copiado!';
+    setTimeout(() => document.getElementById('btn-copy').textContent = 'Copiar resultado', 2000);
+  });
+});
+</script>
+</body>
+</html>
