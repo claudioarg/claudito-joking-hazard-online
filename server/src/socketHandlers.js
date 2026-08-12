@@ -59,8 +59,9 @@ function registerSocketHandlers({ io, config, roomStore, gameFlow, cardRegistry 
       socket.join(roomId);
       socket.data.roomId = roomId;
 
-      const localIP = getLocalIP();
-      const joinUrl = `http://${localIP}:${config.PORT}/join?room=${roomId}`;
+      const external = process.env.RENDER_EXTERNAL_URL || process.env.VERCEL_URL;
+      const host = external ? external.replace(/\/$/, '') : `http://${localIP}:${config.PORT}`;
+      const joinUrl = `${host}/join?room=${roomId}`;
       const qrDataUrl = await QRCode.toDataURL(joinUrl, { width: 256 });
 
       socket.emit('room_created', {

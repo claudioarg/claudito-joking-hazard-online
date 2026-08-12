@@ -49,9 +49,15 @@ app.get('/join', (req, res) => {
 
 server.listen(config.PORT, '0.0.0.0', () => {
   const ip = getLocalIP();
+  const external = process.env.RENDER_EXTERNAL_URL || process.env.VERCEL_URL;
+  const publicUrl = external ? `${external.replace(/\/$/, '')}` : `http://${ip}:${config.PORT}`;
   console.log(`\n🎮 Joking Hazard Online`);
   console.log(`   Local:   http://localhost:${config.PORT}`);
-  console.log(`   Red:     http://${ip}:${config.PORT}`);
+  if (external) {
+    console.log(`   Public:  ${publicUrl}`);
+  } else {
+    console.log(`   Red:     http://${ip}:${config.PORT}`);
+  }
   console.log(`\n   Compartí la URL de red con tus amigos en la misma WiFi.\n`);
 });
 
