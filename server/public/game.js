@@ -265,7 +265,13 @@ const hide = id => {
 
 function screen(name) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  $(`screen-${name}`).classList.add('active');
+  const next = $(`screen-${name}`);
+  if (next) next.classList.add('active');
+  if (name === 'join') {
+    startRoomListAutoRefresh();
+  } else {
+    stopRoomListAutoRefresh();
+  }
 }
 
 function toast(msg, isError = false) {
@@ -710,7 +716,10 @@ if (btnCreate) {
 
 function renderRoomList(rooms) {
   const el = $('room-list');
-  if (!el) return;
+  if (!el) {
+    console.warn('[room-list] #room-list not found');
+    return;
+  }
   el.innerHTML = '';
   if (!rooms || rooms.length === 0) {
     el.innerHTML = '<p class="muted">No hay partidas disponibles en este momento.</p>';
@@ -752,13 +761,16 @@ function stopRoomListAutoRefresh() {
 function requestRoomList() {
   if (socketUnavailable) return;
   if (socket.connected) {
+    console.log('[room-list] requestRoomList connected, emitting list_rooms');
     socket.emit('list_rooms');
   } else {
+    console.log('[room-list] requestRoomList waiting for connect');
     socket.once('connect', () => socket.emit('list_rooms'));
   }
 }
 
 socket.on('rooms_list', (rooms) => {
+  console.log('[room-list] rooms_list received', rooms);
   renderRoomList(rooms);
 });
 
@@ -772,7 +784,7 @@ if (btnRefreshRooms) {
 const btnJoinOpen = $('btn-join-open');
 if (btnJoinOpen) {
   btnJoinOpen.addEventListener('click', () => {
-    startRoomListAutoRefresh();
+    screen('join');
   });
 }
 
