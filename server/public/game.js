@@ -290,12 +290,6 @@ function escapeHtml(value) {
   });
 }
 
-function roomPhaseLabel(phase) {
-  if (phase === 'waiting') return 'Lobby';
-  if (phase === 'game_over') return 'Terminando';
-  return 'En juego';
-}
-
 function readPopupTunerConfig() {
   try {
     const raw = localStorage.getItem(POPUP_TUNER_STORAGE_KEY);
@@ -744,9 +738,7 @@ function renderRoomList(rooms) {
     const roomCode = escapeHtml(room.id);
     const hostName = escapeHtml(room.hostName || 'Jugador');
     const seats = `${room.playerCount} / ${room.maxPlayers || 8}`;
-    const status = room.phase === 'waiting'
-      ? 'Disponible ahora'
-      : (room.canJoin ? 'Entrás al terminar la ronda' : 'Sala llena');
+    const status = room.canJoin === false ? 'Sala llena' : 'Disponible ahora';
     const canJoin = room.canJoin !== false;
 
     const item = document.createElement('div');
@@ -755,7 +747,7 @@ function renderRoomList(rooms) {
       <div class="room-item-info">
         <div class="room-item-code">${roomCode}</div>
         <div class="room-item-meta">Partida creada por ${hostName}</div>
-        <div class="room-item-meta">${seats} jugadores • ${escapeHtml(roomPhaseLabel(room.phase))}</div>
+        <div class="room-item-meta">${seats} jugadores • Lobby</div>
         <div class="room-item-meta">${escapeHtml(status)}</div>
       </div>
       <div>

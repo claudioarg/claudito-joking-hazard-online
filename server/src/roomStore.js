@@ -69,10 +69,14 @@ function createRoomStore({ config, cardRegistry }) {
       .filter(room => room.phase === 'waiting')
       .map(room => {
         const host = room.players.find(p => p.id === room.hostId) || room.players[0];
+        const canJoin = room.players.length < config.MAX_PLAYERS;
         return {
           id: room.id,
+          phase: room.phase,
           hostName: host ? host.name : 'Jugador',
           playerCount: room.players.length,
+          maxPlayers: config.MAX_PLAYERS,
+          canJoin,
           createdAt: room.createdAt,
         };
       })
