@@ -152,6 +152,53 @@ function registerSocketHandlers({ io, config, roomStore, gameFlow, cardRegistry 
       console.log(`[Room] ${name} joined ${room.id}`);
     });
 
+    socket.on('leave_room', () => {
+      const currentRoomId = socket.data.roomId;
+      const room = rooms[currentRoomId];
+      if (!room) {
+        socket.emit('left_room');
+        return;
+      }
+
+      if (room.phase !== 'waiting') {
+        socket.emit('error', { message: 'Solo podés salir de la sala antes de iniciar la partida.' });
+        return;
+      }
+
+      const player = room.players.find(p => p.id === socket.id);
+      const isHostLeaving = room.hostId === socket.id;
+
+      socket.leave(room.id);
+      delete socket.data.roomId;
+
+      if (!player) {
+        socket.emit('left_room');
+        broadcastRoomList();
+        return;
+      }
+
+      room.players = room.players.filter(p => p.id !== socket.id);
+
+      if (isHostLeaving) {
+        io.to(room.id).emit('room_closed', { message: 'El host canceló esta sala.' });
+        for (const p of room.players) {
+          const peerSocket = io.sockets.sockets.get(p.id);
+          if (peerSocket) {
+            peerSocket.leave(room.id);
+            delete peerSocket.data.roomId;
+          }
+        }
+        delete rooms[room.id];
+      } else if (room.players.length === 0) {
+        delete rooms[room.id];
+      } else {
+        io.to(room.id).emit('room_updated', getPublicRoom(room));
+      }
+
+      socket.emit('left_room');
+      broadcastRoomList();
+    });
+
     // Host starts the game
     socket.on('start_game', ({ targetScore }) => {
       const roomId = socket.data.roomId;
@@ -388,6 +435,7 @@ function registerSocketHandlers({ io, config, roomStore, gameFlow, cardRegistry 
       const room = rooms[roomId];
       if (!room || room.hostId !== socket.id) return;
       await gameFlow.terminateMatch(room);
+      broadcastRoomList();
     });
 
     // Advance to next round

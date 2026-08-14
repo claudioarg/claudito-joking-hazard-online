@@ -497,6 +497,26 @@ function clearStoredSession() {
   sessionStorage.removeItem('jh_session');
 }
 
+function resetLocalRoomState() {
+  stopPauseRecovery();
+  roomId = null;
+  gameState = null;
+  isHost = false;
+  myHand = [];
+  resetRoundInteractionState();
+  hide('pause-banner');
+}
+
+function requestLeaveLobby() {
+  if (socketUnavailable) {
+    resetLocalRoomState();
+    clearStoredSession();
+    screen('home');
+    return;
+  }
+  socket.emit('leave_room');
+}
+
 function maybeAutoRejoin() {
   if (socketUnavailable) return;
   const stored = getStoredSession();
@@ -741,7 +761,7 @@ function renderRoomList(rooms) {
     const roomCode = escapeHtml(room.id);
     const hostName = escapeHtml(room.hostName || 'Jugador');
     const seats = `${room.playerCount} / ${room.maxPlayers || 8}`;
-    const status = room.canJoin === false ? 'Sala llena' : 'Disponible ahora';
+    const status = room.canJoin === false ? 'Completa' : 'Disponible';
     const canJoin = room.canJoin !== false;
 
     const item = document.createElement('div');
@@ -836,6 +856,13 @@ if (btnBackHome) {
   btnBackHome.addEventListener('click', () => screen('home'));
 }
 
+const btnLeaveLobby = $('btn-leave-lobby');
+if (btnLeaveLobby) {
+  btnLeaveLobby.addEventListener('click', () => {
+    requestLeaveLobby();
+  });
+}
+
 function submitJoinRoom(forcedRoomCode = null) {
   myName = $('join-player-name').value.trim() || $('player-name').value.trim() || 'Jugador';
   const raw = forcedRoomCode || $('join-room-code').value.trim() || qrRoomCode || '';
@@ -895,6 +922,20 @@ socket.on('room_joined', ({ roomId: rid, room }) => {
   show('lobby-waiting-msg');
   updateTerminateButton();
   screen('lobby');
+});
+
+socket.on('left_room', () => {
+  resetLocalRoomState();
+  clearStoredSession();
+  screen('home');
+  toast('Saliste de la sala');
+});
+
+socket.on('room_closed', ({ message }) => {
+  resetLocalRoomState();
+  clearStoredSession();
+  screen('home');
+  toast(message || 'La sala fue cerrada por el host', true);
 });
 
 socket.on('room_updated', (room) => {

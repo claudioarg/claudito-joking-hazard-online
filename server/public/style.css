@@ -184,6 +184,12 @@ input[type="text"]:focus, select:focus { border-color: var(--accent); }
 }
 .lobby-settings { width: 100%; max-width: 360px; }
 .lobby-settings label { display: flex; flex-direction: column; gap: 6px; font-size: .9rem; color: var(--text-muted); }
+.lobby-actions {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  justify-content: center;
+}
 .muted { color: var(--text-muted); font-size: .85rem; text-align: center; }
 .confirm-bar {
   display: flex;
@@ -276,37 +282,47 @@ input[type="text"]:focus, select:focus { border-color: var(--accent); }
 .room-item {
   background: var(--surface);
   border: 1px solid var(--surface2);
-  border-radius: 10px;
-  padding: 10px;
+  border-radius: 12px;
+  padding: 12px;
   display: flex;
   justify-content: space-between;
-  gap: 8px;
-  align-items: center;
+  gap: 12px;
+  align-items: flex-start;
+  box-shadow: 0 2px 8px rgba(0,0,0,.25);
 }
 
 .room-item-info {
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .room-item-code {
   font-weight: 900;
-  letter-spacing: 1px;
+  letter-spacing: 2px;
   color: var(--accent);
+  font-size: 1rem;
 }
 
 .room-item-meta {
   font-size: .82rem;
   color: var(--text-muted);
+  margin-top: 2px;
 }
 
 .room-item-players {
-  font-size: .82rem;
-  color: var(--text-muted);
+  font-size: .78rem;
+  color: #c7c7dc;
   white-space: nowrap;
+  background: rgba(245,166,35,.15);
+  border: 1px solid rgba(245,166,35,.35);
+  border-radius: 999px;
+  padding: 4px 8px;
+  text-align: center;
+  margin-bottom: 6px;
 }
 
 .room-item-join {
-  padding: 8px 12px;
+  padding: 9px 12px;
   font-size: .84rem;
 }
 

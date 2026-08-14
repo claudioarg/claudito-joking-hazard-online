@@ -10,7 +10,7 @@
   <title>Joking Hazard</title>
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=20260814a" />
 </head>
 <body>
 
@@ -72,6 +72,9 @@
     </div>
     <button class="btn btn-primary" id="btn-start-game">▶ Iniciar juego</button>
     <p id="lobby-waiting-msg" class="muted"></p>
+    <div class="lobby-actions">
+      <button class="btn btn-ghost" id="btn-leave-lobby">← Salir de sala</button>
+    </div>
   </div>
 </div>
 
@@ -182,7 +185,7 @@
 <div id="toast" class="toast"></div>
 
 <script src="vendor/socket.io.min.js?v=20260610a"></script>
-<script src="game.js?v=20260814a"></script>
+<script src="game.js?v=20260814b"></script>
 <script src="pwa-register.js?v=20260809a"></script>
 </body>
 </html>
