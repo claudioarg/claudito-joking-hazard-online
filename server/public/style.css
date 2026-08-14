@@ -242,6 +242,84 @@ input[type="text"]:focus, select:focus { border-color: var(--accent); }
   max-width: 320px;
 }
 
+.join-search-panel {
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.join-search-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.join-search-row input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.join-search-row .btn {
+  padding: 12px 14px;
+  white-space: nowrap;
+}
+
+.join-search-note {
+  font-size: .82rem;
+  color: var(--text-muted);
+}
+
+.join-room-results {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.join-room-result {
+  background: var(--surface);
+  border: 1px solid var(--surface2);
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+
+.join-room-result-main {
+  min-width: 0;
+}
+
+.join-room-result-code {
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: var(--accent);
+}
+
+.join-room-result-meta {
+  font-size: .82rem;
+  color: var(--text-muted);
+}
+
+.join-room-result-cta {
+  padding: 8px 12px;
+  font-size: .84rem;
+}
+
+.join-room-empty {
+  font-size: .85rem;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 8px;
+  border: 1px dashed var(--surface2);
+  border-radius: 10px;
+}
+
 /* === Game Layout === */
 .game-layout {
   display: flex;
