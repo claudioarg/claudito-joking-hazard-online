@@ -6,7 +6,55 @@ const QRCode = require('qrcode');
 const { getLocalIP } = require('./network');
 
 function registerSocketHandlers({ io, config, roomStore, gameFlow, cardRegistry }) {
-  const { rooms, createRoom, getPublicRoom, listPublicRooms, normalizePlayerName, normalizeRoomCode, findPlayerByName, migratePlayerSocketInRoom } = roomStore;
+  const { rooms, createRoom, getPublicRoom, normalizePlayerName, normalizeRoomCode, findPlayerByName, migratePlayerSocketInRoom } = roomStore;
+  const localIP = getLocalIP();
+
+  function buildRoomSearchResults(query) {
+    const rawQuery = String(query || '').trim();
+    const normalizedCodeQuery = normalizeRoomCode(rawQuery);
+    const normalizedTextQuery = rawQuery.toLowerCase();
+
+    const matchesQuery = (room, hostName) => {
+      if (!rawQuery) return true;
+      if (normalizedCodeQuery && room.id.includes(normalizedCodeQuery)) return true;
+      return hostName.toLowerCase().includes(normalizedTextQuery);
+    };
+
+    return Object.values(rooms)
+      .filter(room => room && room.players && room.players.length > 0)
+      .filter((room) => {
+        const host = room.players.find(p => p.id === room.hostId) || room.players[0];
+        const hostName = host?.name || 'Sin host';
+        return matchesQuery(room, hostName);
+      })
+      .map((room) => {
+        const host = room.players.find(p => p.id === room.hostId) || room.players[0];
+        const pendingNewCount = (room.pendingJoins || []).filter(p => p.type === 'new').length;
+        const totalSeatsUsed = room.players.length + pendingNewCount;
+        const canJoin = totalSeatsUsed < config.MAX_PLAYERS;
+
+        return {
+          roomId: room.id,
+          phase: room.phase,
+          hostName: host?.name || 'Sin host',
+          playerCount: room.players.length,
+          maxPlayers: config.MAX_PLAYERS,
+          pendingJoinCount: (room.pendingJoins || []).length,
+          joinQueued: room.phase !== 'waiting',
+          canJoin,
+          createdAt: room.createdAt || 0,
+        };
+      })
+      .sort((a, b) => {
+        const waitingDiff = Number(b.phase === 'waiting') - Number(a.phase === 'waiting');
+        if (waitingDiff !== 0) return waitingDiff;
+        const seatDiff = Number(b.canJoin) - Number(a.canJoin);
+        if (seatDiff !== 0) return seatDiff;
+        return b.createdAt - a.createdAt;
+      })
+      .slice(0, 30)
+      .map(({ createdAt, ...room }) => room);
+  }
 
   function buildClientSnapshot(room, socketId) {
     const player = room.players.find(p => p.id === socketId);
@@ -60,7 +108,7 @@ function registerSocketHandlers({ io, config, roomStore, gameFlow, cardRegistry 
       socket.data.roomId = roomId;
 
       const external = process.env.RENDER_EXTERNAL_URL || process.env.VERCEL_URL;
-      const host = external ? external.replace(/\/$/, '') : `http://${getLocalIP()}:${config.PORT}`;
+      const host = external ? external.replace(/\/$/, '') : `http://${localIP}:${config.PORT}`;
       const joinUrl = `${host}/join?room=${roomId}`;
       const qrDataUrl = await QRCode.toDataURL(joinUrl, { width: 256 });
 
@@ -141,6 +189,11 @@ function registerSocketHandlers({ io, config, roomStore, gameFlow, cardRegistry 
       socket.emit('room_joined', { roomId: room.id, room: getPublicRoom(room) });
       io.to(room.id).emit('room_updated', getPublicRoom(room));
       console.log(`[Room] ${name} joined ${room.id}`);
+    });
+
+    socket.on('search_rooms', ({ query } = {}) => {
+      const roomsFound = buildRoomSearchResults(query);
+      socket.emit('rooms_found', { rooms: roomsFound });
     });
 
     // Host starts the game

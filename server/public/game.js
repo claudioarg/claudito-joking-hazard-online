@@ -27,6 +27,7 @@ let judgePlacementPreview = null;
 let initialCardChangePending = false;
 let pauseRecoveryTimer = null;
 let pauseRecoveryInFlight = false;
+let joinRoomsLastQuery = '';
 
 const POPUP_TUNER_STORAGE_KEY = 'jh_popup_tuner_v1';
 const POPUP_TUNER_DEFAULTS = {
@@ -280,6 +281,64 @@ function toast(msg, isError = false) {
   el.className = 'toast' + (isError ? ' error' : '') + ' show';
   clearTimeout(toast._t);
   toast._t = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+function escapeHtml(value) {
+  return String(value || '').replace(/[&<>"']/g, (ch) => {
+    if (ch === '&') return '&amp;';
+    if (ch === '<') return '&lt;';
+    if (ch === '>') return '&gt;';
+    if (ch === '"') return '&quot;';
+    return '&#39;';
+  });
+}
+
+function roomPhaseLabel(phase) {
+  if (phase === 'waiting') return 'Lobby';
+  if (phase === 'game_over') return 'Terminando';
+  return 'En juego';
+}
+
+function renderJoinRoomResults(rooms) {
+  const container = $('join-room-results');
+  if (!container) return;
+  if (!rooms || !rooms.length) {
+    container.innerHTML = '<div class="join-room-empty">No hay salas disponibles ahora.</div>';
+    return;
+  }
+
+  container.innerHTML = rooms.map((room) => {
+    const queueHint = room.joinQueued ? 'Te sumás al terminar la ronda' : 'Entrás al lobby ahora';
+    const fullHint = room.canJoin ? queueHint : 'Sala llena';
+    return `
+      <div class="join-room-result">
+        <div class="join-room-result-main">
+          <div class="join-room-result-code">${escapeHtml(room.roomId)}</div>
+          <div class="join-room-result-meta">Host: ${escapeHtml(room.hostName)}</div>
+          <div class="join-room-result-meta">${room.playerCount}/${room.maxPlayers} jugadores • ${roomPhaseLabel(room.phase)}</div>
+          <div class="join-room-result-meta">${escapeHtml(fullHint)}</div>
+        </div>
+        <button class="btn btn-primary join-room-result-cta" data-room-id="${escapeHtml(room.roomId)}" ${room.canJoin ? '' : 'disabled'}>${room.canJoin ? 'Unirme' : 'Llena'}</button>
+      </div>
+    `;
+  }).join('');
+}
+
+function requestJoinRoomSearch({ silent = false } = {}) {
+  const queryInput = $('join-room-search');
+  joinRoomsLastQuery = queryInput ? queryInput.value.trim() : '';
+
+  const container = $('join-room-results');
+  if (container && !silent) {
+    container.innerHTML = '<div class="join-room-empty">Buscando salas...</div>';
+  }
+
+  if (socketUnavailable) {
+    if (container) container.innerHTML = '<div class="join-room-empty">Sin conexión al servidor.</div>';
+    return;
+  }
+
+  socket.emit('search_rooms', { query: joinRoomsLastQuery });
 }
 
 function readPopupTunerConfig() {
@@ -788,6 +847,7 @@ const btnJoinOpen = $('btn-join-open');
 if (btnJoinOpen) {
   btnJoinOpen.addEventListener('click', () => {
     screen('join');
+    requestJoinRoomSearch({ silent: false });
   });
 }
 
@@ -799,9 +859,9 @@ if (btnBackHome) {
   });
 }
 
-function submitJoinRoom() {
+function submitJoinRoom(forcedRoomCode = null) {
   myName = $('join-player-name').value.trim() || $('player-name').value.trim() || 'Jugador';
-  const raw = $('join-room-code').value.trim() || qrRoomCode || '';
+  const raw = forcedRoomCode || $('join-room-code').value.trim() || qrRoomCode || '';
   const code = raw
     .replace(/[?&]room=([A-Za-z0-9]+)/i, '$1')
     .replace(/[^A-Za-z0-9]/g, '')
@@ -825,6 +885,36 @@ if (joinPlayerNameInput) {
     submitJoinRoom();
   });
 }
+
+const btnSearchRooms = $('btn-search-rooms');
+if (btnSearchRooms) {
+  btnSearchRooms.addEventListener('click', () => requestJoinRoomSearch({ silent: false }));
+}
+
+const joinRoomSearchInput = $('join-room-search');
+if (joinRoomSearchInput) {
+  joinRoomSearchInput.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Enter') return;
+    ev.preventDefault();
+    requestJoinRoomSearch({ silent: false });
+  });
+}
+
+const joinRoomResults = $('join-room-results');
+if (joinRoomResults) {
+  joinRoomResults.addEventListener('click', (ev) => {
+    const button = ev.target.closest('[data-room-id]');
+    if (!button || button.disabled) return;
+    const selectedRoomId = button.getAttribute('data-room-id');
+    if (!selectedRoomId) return;
+    $('join-room-code').value = selectedRoomId;
+    submitJoinRoom(selectedRoomId);
+  });
+}
+
+socket.on('rooms_found', ({ rooms }) => {
+  renderJoinRoomResults(rooms || []);
+});
 
 // === Lobby ===
 socket.on('room_created', ({ roomId: rid, joinUrl, qrDataUrl, room }) => {
