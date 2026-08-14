@@ -64,6 +64,21 @@ function createRoomStore({ config, cardRegistry }) {
     };
   }
 
+  function listPublicRooms() {
+    return Object.values(rooms)
+      .filter(room => room.phase === 'waiting')
+      .map(room => {
+        const host = room.players.find(p => p.id === room.hostId) || room.players[0];
+        return {
+          id: room.id,
+          hostName: host ? host.name : 'Jugador',
+          playerCount: room.players.length,
+          createdAt: room.createdAt,
+        };
+      })
+      .sort((a, b) => a.createdAt - b.createdAt);
+  }
+
   function normalizePlayerName(name, fallback = 'Jugador') {
     const value = String(name || '').trim();
     return value || fallback;
@@ -130,6 +145,7 @@ function createRoomStore({ config, cardRegistry }) {
     rooms,
     createRoom,
     getPublicRoom,
+    listPublicRooms,
     normalizePlayerName,
     normalizeRoomCode,
     findPlayerByName,

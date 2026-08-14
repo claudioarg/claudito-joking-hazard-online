@@ -692,7 +692,7 @@ window.addEventListener('DOMContentLoaded', () => {
     $('join-room-code').style.display = 'none';
     $('join-room-display').textContent = code;
     $('join-room-display').classList.remove('hidden');
-    screen('join');
+    startRoomListAutoRefresh();
     setTimeout(() => $('join-player-name').focus(), 100);
   } else {
     screen('home');
@@ -708,16 +708,80 @@ if (btnCreate) {
   });
 }
 
+function renderRoomList(rooms) {
+  const el = $('room-list');
+  if (!el) return;
+  el.innerHTML = '';
+  if (!rooms || rooms.length === 0) {
+    el.innerHTML = '<p class="muted">No hay partidas disponibles en este momento.</p>';
+    return;
+  }
+  rooms.forEach(room => {
+    const item = document.createElement('div');
+    item.className = 'room-item';
+    item.innerHTML = `
+      <div class="room-item-info">
+        <span class="room-item-code">${room.id}</span>
+        <span class="room-item-meta">Partida creada por ${room.hostName}</span>
+      </div>
+      <span class="room-item-players">${room.playerCount} / 8</span>
+    `;
+    item.addEventListener('click', () => {
+      $('join-room-code').value = room.id;
+      $('join-player-name').focus();
+    });
+    el.appendChild(item);
+  });
+}
+
+let roomListInterval = null;
+
+function startRoomListAutoRefresh() {
+  stopRoomListAutoRefresh();
+  requestRoomList();
+  roomListInterval = setInterval(requestRoomList, 3000);
+}
+
+function stopRoomListAutoRefresh() {
+  if (roomListInterval) {
+    clearInterval(roomListInterval);
+    roomListInterval = null;
+  }
+}
+
+function requestRoomList() {
+  if (socketUnavailable) return;
+  if (socket.connected) {
+    socket.emit('list_rooms');
+  } else {
+    socket.once('connect', () => socket.emit('list_rooms'));
+  }
+}
+
+socket.on('rooms_list', (rooms) => {
+  renderRoomList(rooms);
+});
+
+const btnRefreshRooms = $('btn-refresh-rooms');
+if (btnRefreshRooms) {
+  btnRefreshRooms.addEventListener('click', () => {
+    requestRoomList();
+  });
+}
+
 const btnJoinOpen = $('btn-join-open');
 if (btnJoinOpen) {
   btnJoinOpen.addEventListener('click', () => {
-    screen('join');
+    startRoomListAutoRefresh();
   });
 }
 
 const btnBackHome = $('btn-back-home');
 if (btnBackHome) {
-  btnBackHome.addEventListener('click', () => screen('home'));
+  btnBackHome.addEventListener('click', () => {
+    stopRoomListAutoRefresh();
+    screen('home');
+  });
 }
 
 function submitJoinRoom() {
@@ -749,6 +813,7 @@ if (joinPlayerNameInput) {
 
 // === Lobby ===
 socket.on('room_created', ({ roomId: rid, joinUrl, qrDataUrl, room }) => {
+  stopRoomListAutoRefresh();
   roomId = rid;
   isHost = true;
   myName = myName || $('player-name').value.trim() || 'Host';
@@ -765,6 +830,7 @@ socket.on('room_created', ({ roomId: rid, joinUrl, qrDataUrl, room }) => {
 });
 
 socket.on('room_joined', ({ roomId: rid, room }) => {
+  stopRoomListAutoRefresh();
   roomId = rid;
   isHost = room.hostId === myId;
   setStoredSession({ roomId: rid, name: myName });

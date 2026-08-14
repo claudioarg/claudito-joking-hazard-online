@@ -242,6 +242,65 @@ input[type="text"]:focus, select:focus { border-color: var(--accent); }
   max-width: 320px;
 }
 
+/* === Room List === */
+.room-list-header {
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: .9rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-top: 8px;
+}
+.room-list-header .btn-small { padding: 4px 10px; font-size: .8rem; }
+.room-list {
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.room-item {
+  background: var(--surface);
+  border: 2px solid transparent;
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.room-item:hover, .room-item:active {
+  border-color: var(--accent);
+  background: var(--surface2);
+}
+.room-item-info { display: flex; flex-direction: column; gap: 2px; }
+.room-item-code {
+  font-weight: 900;
+  font-size: 1.1rem;
+  letter-spacing: 2px;
+  color: var(--text);
+}
+.room-item-meta {
+  font-size: .8rem;
+  color: var(--text-muted);
+}
+.room-item-players {
+  font-size: .75rem;
+  color: var(--text-muted);
+  background: var(--surface2);
+  padding: 4px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
 /* === Game Layout === */
 .game-layout {
   display: flex;

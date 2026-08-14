@@ -6,7 +6,7 @@ const QRCode = require('qrcode');
 const { getLocalIP } = require('./network');
 
 function registerSocketHandlers({ io, config, roomStore, gameFlow, cardRegistry }) {
-  const { rooms, createRoom, getPublicRoom, normalizePlayerName, normalizeRoomCode, findPlayerByName, migratePlayerSocketInRoom } = roomStore;
+  const { rooms, createRoom, getPublicRoom, listPublicRooms, normalizePlayerName, normalizeRoomCode, findPlayerByName, migratePlayerSocketInRoom } = roomStore;
 
   function buildClientSnapshot(room, socketId) {
     const player = room.players.find(p => p.id === socketId);
@@ -60,7 +60,7 @@ function registerSocketHandlers({ io, config, roomStore, gameFlow, cardRegistry 
       socket.data.roomId = roomId;
 
       const external = process.env.RENDER_EXTERNAL_URL || process.env.VERCEL_URL;
-      const host = external ? external.replace(/\/$/, '') : `http://${localIP}:${config.PORT}`;
+      const host = external ? external.replace(/\/$/, '') : `http://${getLocalIP()}:${config.PORT}`;
       const joinUrl = `${host}/join?room=${roomId}`;
       const qrDataUrl = await QRCode.toDataURL(joinUrl, { width: 256 });
 
@@ -71,6 +71,12 @@ function registerSocketHandlers({ io, config, roomStore, gameFlow, cardRegistry 
         room: getPublicRoom(room),
       });
       console.log(`[Room] Created: ${roomId} by ${name}`);
+    });
+
+    // List available public rooms
+    socket.on('list_rooms', () => {
+      const publicRooms = listPublicRooms();
+      socket.emit('rooms_list', publicRooms);
     });
 
     // Join an existing room
