@@ -6,54 +6,11 @@ const QRCode = require('qrcode');
 const { getLocalIP } = require('./network');
 
 function registerSocketHandlers({ io, config, roomStore, gameFlow, cardRegistry }) {
-  const { rooms, createRoom, getPublicRoom, normalizePlayerName, normalizeRoomCode, findPlayerByName, migratePlayerSocketInRoom } = roomStore;
+  const { rooms, createRoom, getPublicRoom, listPublicRooms, normalizePlayerName, normalizeRoomCode, findPlayerByName, migratePlayerSocketInRoom } = roomStore;
   const localIP = getLocalIP();
 
-  function buildRoomSearchResults(query) {
-    const rawQuery = String(query || '').trim();
-    const normalizedCodeQuery = normalizeRoomCode(rawQuery);
-    const normalizedTextQuery = rawQuery.toLowerCase();
-
-    const matchesQuery = (room, hostName) => {
-      if (!rawQuery) return true;
-      if (normalizedCodeQuery && room.id.includes(normalizedCodeQuery)) return true;
-      return hostName.toLowerCase().includes(normalizedTextQuery);
-    };
-
-    return Object.values(rooms)
-      .filter(room => room && room.players && room.players.length > 0)
-      .filter((room) => {
-        const host = room.players.find(p => p.id === room.hostId) || room.players[0];
-        const hostName = host?.name || 'Sin host';
-        return matchesQuery(room, hostName);
-      })
-      .map((room) => {
-        const host = room.players.find(p => p.id === room.hostId) || room.players[0];
-        const pendingNewCount = (room.pendingJoins || []).filter(p => p.type === 'new').length;
-        const totalSeatsUsed = room.players.length + pendingNewCount;
-        const canJoin = totalSeatsUsed < config.MAX_PLAYERS;
-
-        return {
-          roomId: room.id,
-          phase: room.phase,
-          hostName: host?.name || 'Sin host',
-          playerCount: room.players.length,
-          maxPlayers: config.MAX_PLAYERS,
-          pendingJoinCount: (room.pendingJoins || []).length,
-          joinQueued: room.phase !== 'waiting',
-          canJoin,
-          createdAt: room.createdAt || 0,
-        };
-      })
-      .sort((a, b) => {
-        const waitingDiff = Number(b.phase === 'waiting') - Number(a.phase === 'waiting');
-        if (waitingDiff !== 0) return waitingDiff;
-        const seatDiff = Number(b.canJoin) - Number(a.canJoin);
-        if (seatDiff !== 0) return seatDiff;
-        return b.createdAt - a.createdAt;
-      })
-      .slice(0, 30)
-      .map(({ createdAt, ...room }) => room);
+  function broadcastRoomList() {
+    io.emit('rooms_list', listPublicRooms());
   }
 
   function buildClientSnapshot(room, socketId) {
@@ -95,6 +52,7 @@ function registerSocketHandlers({ io, config, roomStore, gameFlow, cardRegistry 
 
   io.on('connection', (socket) => {
     console.log(`[+] Connected: ${socket.id}`);
+    socket.emit('rooms_list', listPublicRooms());
 
     // Create a new room
     socket.on('create_room', async ({ name, targetScore }) => {
@@ -118,6 +76,7 @@ function registerSocketHandlers({ io, config, roomStore, gameFlow, cardRegistry 
         qrDataUrl,
         room: getPublicRoom(room),
       });
+      broadcastRoomList();
       console.log(`[Room] Created: ${roomId} by ${name}`);
     });
 
@@ -172,6 +131,7 @@ function registerSocketHandlers({ io, config, roomStore, gameFlow, cardRegistry 
 
         socket.emit('room_joined', { roomId: room.id, room: getPublicRoom(room) });
         io.to(room.id).emit('room_updated', getPublicRoom(room));
+        broadcastRoomList();
         console.log(`[Room] ${normalizedName} rejoined ${room.id}`);
         return;
       }
@@ -188,12 +148,8 @@ function registerSocketHandlers({ io, config, roomStore, gameFlow, cardRegistry 
 
       socket.emit('room_joined', { roomId: room.id, room: getPublicRoom(room) });
       io.to(room.id).emit('room_updated', getPublicRoom(room));
+      broadcastRoomList();
       console.log(`[Room] ${name} joined ${room.id}`);
-    });
-
-    socket.on('search_rooms', ({ query } = {}) => {
-      const roomsFound = buildRoomSearchResults(query);
-      socket.emit('rooms_found', { rooms: roomsFound });
     });
 
     // Host starts the game
@@ -214,6 +170,7 @@ function registerSocketHandlers({ io, config, roomStore, gameFlow, cardRegistry 
       gameFlow.dealInitialHands(room);
       room.phase = 'playing';
       io.to(room.id).emit('game_started', getPublicRoom(room));
+      broadcastRoomList();
       gameFlow.startRound(room);
     });
 
@@ -602,12 +559,14 @@ function registerSocketHandlers({ io, config, roomStore, gameFlow, cardRegistry 
             if (room.players.length === 0) {
               delete rooms[roomId];
               console.log(`[Room] Deleted empty room: ${roomId}`);
+              broadcastRoomList();
             } else {
               room.disconnectedIds = (room.disconnectedIds || []).filter(id => id !== socket.id);
               if (!room.disconnectedIds.length) room.paused = false;
               if (room.hostId === socket.id) room.hostId = room.players[0].id;
               if (room.judgeIndex >= room.players.length) room.judgeIndex = 0;
               io.to(room.id).emit('room_updated', getPublicRoom(room));
+              broadcastRoomList();
               if (!room.paused) {
                 gameFlow.resumePausedRoom(room);
                 io.to(room.id).emit('room_resumed', { room: getPublicRoom(room) });

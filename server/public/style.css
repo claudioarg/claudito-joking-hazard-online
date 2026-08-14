@@ -242,45 +242,38 @@ input[type="text"]:focus, select:focus { border-color: var(--accent); }
   max-width: 320px;
 }
 
-.join-search-panel {
-  width: 100%;
-  max-width: 320px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.join-search-row {
-  display: flex;
-  gap: 8px;
-  align-items: stretch;
-}
-
-.join-search-row input {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.join-search-row .btn {
-  padding: 12px 14px;
-  white-space: nowrap;
-}
-
-.join-search-note {
+.join-list-note {
   font-size: .82rem;
   color: var(--text-muted);
 }
 
-.join-room-results {
+.room-list-header {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--text-muted);
+  font-size: .85rem;
+}
+
+.btn-small {
+  padding: 6px 10px;
+  font-size: .84rem;
+}
+
+.room-list {
+  width: 100%;
+  max-width: 360px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 220px;
+  max-height: 230px;
   overflow-y: auto;
   padding-right: 2px;
 }
 
-.join-room-result {
+.room-item {
   background: var(--surface);
   border: 1px solid var(--surface2);
   border-radius: 10px;
@@ -291,33 +284,30 @@ input[type="text"]:focus, select:focus { border-color: var(--accent); }
   align-items: center;
 }
 
-.join-room-result-main {
+.room-item-info {
   min-width: 0;
 }
 
-.join-room-result-code {
+.room-item-code {
   font-weight: 900;
   letter-spacing: 1px;
   color: var(--accent);
 }
 
-.join-room-result-meta {
+.room-item-meta {
   font-size: .82rem;
   color: var(--text-muted);
 }
 
-.join-room-result-cta {
-  padding: 8px 12px;
-  font-size: .84rem;
+.room-item-players {
+  font-size: .82rem;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
-.join-room-empty {
-  font-size: .85rem;
-  color: var(--text-muted);
-  text-align: center;
-  padding: 8px;
-  border: 1px dashed var(--surface2);
-  border-radius: 10px;
+.room-item-join {
+  padding: 8px 12px;
+  font-size: .84rem;
 }
 
 /* === Game Layout === */

@@ -27,7 +27,6 @@ let judgePlacementPreview = null;
 let initialCardChangePending = false;
 let pauseRecoveryTimer = null;
 let pauseRecoveryInFlight = false;
-let joinRoomsLastQuery = '';
 
 const POPUP_TUNER_STORAGE_KEY = 'jh_popup_tuner_v1';
 const POPUP_TUNER_DEFAULTS = {
@@ -269,9 +268,7 @@ function screen(name) {
   const next = $(`screen-${name}`);
   if (next) next.classList.add('active');
   if (name === 'join') {
-    startRoomListAutoRefresh();
-  } else {
-    stopRoomListAutoRefresh();
+    requestRoomList();
   }
 }
 
@@ -297,48 +294,6 @@ function roomPhaseLabel(phase) {
   if (phase === 'waiting') return 'Lobby';
   if (phase === 'game_over') return 'Terminando';
   return 'En juego';
-}
-
-function renderJoinRoomResults(rooms) {
-  const container = $('join-room-results');
-  if (!container) return;
-  if (!rooms || !rooms.length) {
-    container.innerHTML = '<div class="join-room-empty">No hay salas disponibles ahora.</div>';
-    return;
-  }
-
-  container.innerHTML = rooms.map((room) => {
-    const queueHint = room.joinQueued ? 'Te sumás al terminar la ronda' : 'Entrás al lobby ahora';
-    const fullHint = room.canJoin ? queueHint : 'Sala llena';
-    return `
-      <div class="join-room-result">
-        <div class="join-room-result-main">
-          <div class="join-room-result-code">${escapeHtml(room.roomId)}</div>
-          <div class="join-room-result-meta">Host: ${escapeHtml(room.hostName)}</div>
-          <div class="join-room-result-meta">${room.playerCount}/${room.maxPlayers} jugadores • ${roomPhaseLabel(room.phase)}</div>
-          <div class="join-room-result-meta">${escapeHtml(fullHint)}</div>
-        </div>
-        <button class="btn btn-primary join-room-result-cta" data-room-id="${escapeHtml(room.roomId)}" ${room.canJoin ? '' : 'disabled'}>${room.canJoin ? 'Unirme' : 'Llena'}</button>
-      </div>
-    `;
-  }).join('');
-}
-
-function requestJoinRoomSearch({ silent = false } = {}) {
-  const queryInput = $('join-room-search');
-  joinRoomsLastQuery = queryInput ? queryInput.value.trim() : '';
-
-  const container = $('join-room-results');
-  if (container && !silent) {
-    container.innerHTML = '<div class="join-room-empty">Buscando salas...</div>';
-  }
-
-  if (socketUnavailable) {
-    if (container) container.innerHTML = '<div class="join-room-empty">Sin conexión al servidor.</div>';
-    return;
-  }
-
-  socket.emit('search_rooms', { query: joinRoomsLastQuery });
 }
 
 function readPopupTunerConfig() {
@@ -727,6 +682,10 @@ function applyRoomSnapshot({ room, hand, isJudge: judge, phaseData }, { announce
 socket.on('connect', () => {
   myId = socket.id;
   maybeAutoRejoin();
+  const joinScreen = $('screen-join');
+  if (joinScreen && joinScreen.classList.contains('active')) {
+    requestRoomList();
+  }
 });
 
 document.addEventListener('visibilitychange', () => {
@@ -757,7 +716,7 @@ window.addEventListener('DOMContentLoaded', () => {
     $('join-room-code').style.display = 'none';
     $('join-room-display').textContent = code;
     $('join-room-display').classList.remove('hidden');
-    startRoomListAutoRefresh();
+    screen('join');
     setTimeout(() => $('join-player-name').focus(), 100);
   } else {
     screen('home');
@@ -775,64 +734,58 @@ if (btnCreate) {
 
 function renderRoomList(rooms) {
   const el = $('room-list');
-  if (!el) {
-    console.warn('[room-list] #room-list not found');
-    return;
-  }
+  if (!el) return;
   el.innerHTML = '';
   if (!rooms || rooms.length === 0) {
     el.innerHTML = '<p class="muted">No hay partidas disponibles en este momento.</p>';
     return;
   }
   rooms.forEach(room => {
+    const roomCode = escapeHtml(room.id);
+    const hostName = escapeHtml(room.hostName || 'Jugador');
+    const seats = `${room.playerCount} / ${room.maxPlayers || 8}`;
+    const status = room.phase === 'waiting'
+      ? 'Disponible ahora'
+      : (room.canJoin ? 'Entrás al terminar la ronda' : 'Sala llena');
+    const canJoin = room.canJoin !== false;
+
     const item = document.createElement('div');
     item.className = 'room-item';
     item.innerHTML = `
       <div class="room-item-info">
-        <span class="room-item-code">${room.id}</span>
-        <span class="room-item-meta">Partida creada por ${room.hostName}</span>
+        <div class="room-item-code">${roomCode}</div>
+        <div class="room-item-meta">Partida creada por ${hostName}</div>
+        <div class="room-item-meta">${seats} jugadores • ${escapeHtml(roomPhaseLabel(room.phase))}</div>
+        <div class="room-item-meta">${escapeHtml(status)}</div>
       </div>
-      <span class="room-item-players">${room.playerCount} / 8</span>
+      <div>
+        <div class="room-item-players">${seats}</div>
+        <button class="btn btn-primary room-item-join" ${canJoin ? '' : 'disabled'}>${canJoin ? 'Unirme' : 'Llena'}</button>
+      </div>
     `;
-    item.addEventListener('click', () => {
+
+    const joinBtn = item.querySelector('.room-item-join');
+    joinBtn.addEventListener('click', () => {
+      $('join-room-code').value = room.id;
+      submitJoinRoom(room.id);
+    });
+
+    item.addEventListener('click', (ev) => {
+      if (ev.target.closest('.room-item-join')) return;
       $('join-room-code').value = room.id;
       $('join-player-name').focus();
     });
+
     el.appendChild(item);
   });
 }
 
-let roomListInterval = null;
-
-function startRoomListAutoRefresh() {
-  stopRoomListAutoRefresh();
-  requestRoomList();
-  roomListInterval = setInterval(requestRoomList, 3000);
-}
-
-function stopRoomListAutoRefresh() {
-  if (roomListInterval) {
-    clearInterval(roomListInterval);
-    roomListInterval = null;
-  }
-}
-
 function requestRoomList() {
   if (socketUnavailable) return;
-  if (socket.connected) {
-    console.log('[room-list] requestRoomList connected, emitting list_rooms');
-    socket.emit('list_rooms');
-  } else {
-    console.log('[room-list] requestRoomList waiting for connect');
-    socket.once('connect', () => {
-      console.log('[room-list] connected, emitting list_rooms');
-      socket.emit('list_rooms');
-    });
-  }
+  if (socket.connected) socket.emit('list_rooms');
 }
 
 socket.on('rooms_list', (rooms) => {
-  console.log('[room-list] rooms_list received', rooms);
   renderRoomList(rooms);
 });
 
@@ -847,16 +800,13 @@ const btnJoinOpen = $('btn-join-open');
 if (btnJoinOpen) {
   btnJoinOpen.addEventListener('click', () => {
     screen('join');
-    requestJoinRoomSearch({ silent: false });
+    requestRoomList();
   });
 }
 
 const btnBackHome = $('btn-back-home');
 if (btnBackHome) {
-  btnBackHome.addEventListener('click', () => {
-    stopRoomListAutoRefresh();
-    screen('home');
-  });
+  btnBackHome.addEventListener('click', () => screen('home'));
 }
 
 function submitJoinRoom(forcedRoomCode = null) {
@@ -886,39 +836,8 @@ if (joinPlayerNameInput) {
   });
 }
 
-const btnSearchRooms = $('btn-search-rooms');
-if (btnSearchRooms) {
-  btnSearchRooms.addEventListener('click', () => requestJoinRoomSearch({ silent: false }));
-}
-
-const joinRoomSearchInput = $('join-room-search');
-if (joinRoomSearchInput) {
-  joinRoomSearchInput.addEventListener('keydown', (ev) => {
-    if (ev.key !== 'Enter') return;
-    ev.preventDefault();
-    requestJoinRoomSearch({ silent: false });
-  });
-}
-
-const joinRoomResults = $('join-room-results');
-if (joinRoomResults) {
-  joinRoomResults.addEventListener('click', (ev) => {
-    const button = ev.target.closest('[data-room-id]');
-    if (!button || button.disabled) return;
-    const selectedRoomId = button.getAttribute('data-room-id');
-    if (!selectedRoomId) return;
-    $('join-room-code').value = selectedRoomId;
-    submitJoinRoom(selectedRoomId);
-  });
-}
-
-socket.on('rooms_found', ({ rooms }) => {
-  renderJoinRoomResults(rooms || []);
-});
-
 // === Lobby ===
 socket.on('room_created', ({ roomId: rid, joinUrl, qrDataUrl, room }) => {
-  stopRoomListAutoRefresh();
   roomId = rid;
   isHost = true;
   myName = myName || $('player-name').value.trim() || 'Host';
@@ -935,7 +854,6 @@ socket.on('room_created', ({ roomId: rid, joinUrl, qrDataUrl, room }) => {
 });
 
 socket.on('room_joined', ({ roomId: rid, room }) => {
-  stopRoomListAutoRefresh();
   roomId = rid;
   isHost = room.hostId === myId;
   setStoredSession({ roomId: rid, name: myName });
