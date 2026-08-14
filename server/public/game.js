@@ -27,6 +27,7 @@ let judgePlacementPreview = null;
 let initialCardChangePending = false;
 let pauseRecoveryTimer = null;
 let pauseRecoveryInFlight = false;
+let roomListPollTimer = null;
 
 const POPUP_TUNER_STORAGE_KEY = 'jh_popup_tuner_v1';
 const POPUP_TUNER_DEFAULTS = {
@@ -268,7 +269,9 @@ function screen(name) {
   const next = $(`screen-${name}`);
   if (next) next.classList.add('active');
   if (name === 'join') {
-    requestRoomList();
+    startRoomListAutoRefresh();
+  } else {
+    stopRoomListAutoRefresh();
   }
 }
 
@@ -772,9 +775,42 @@ function renderRoomList(rooms) {
   });
 }
 
-function requestRoomList() {
-  if (socketUnavailable) return;
-  if (socket.connected) socket.emit('list_rooms');
+function setRoomListMessage(message) {
+  const el = $('room-list');
+  if (!el) return;
+  el.innerHTML = `<p class="muted">${escapeHtml(message)}</p>`;
+}
+
+function startRoomListAutoRefresh() {
+  stopRoomListAutoRefresh();
+  requestRoomList();
+  roomListPollTimer = setInterval(() => {
+    requestRoomList({ silent: true });
+  }, 3000);
+}
+
+function stopRoomListAutoRefresh() {
+  if (!roomListPollTimer) return;
+  clearInterval(roomListPollTimer);
+  roomListPollTimer = null;
+}
+
+function requestRoomList({ silent = false } = {}) {
+  if (socketUnavailable) {
+    if (!silent) setRoomListMessage('No se pudo conectar al servidor.');
+    return;
+  }
+
+  if (!silent) setRoomListMessage('Buscando partidas en lobby...');
+
+  if (socket.connected) {
+    socket.emit('list_rooms');
+    return;
+  }
+
+  if (typeof socket.connect === 'function') socket.connect();
+  socket.once('connect', () => socket.emit('list_rooms'));
+  if (!silent) setRoomListMessage('Conectando...');
 }
 
 socket.on('rooms_list', (rooms) => {
@@ -792,7 +828,6 @@ const btnJoinOpen = $('btn-join-open');
 if (btnJoinOpen) {
   btnJoinOpen.addEventListener('click', () => {
     screen('join');
-    requestRoomList();
   });
 }
 
