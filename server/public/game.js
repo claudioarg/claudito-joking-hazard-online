@@ -765,7 +765,10 @@ function requestRoomList() {
     socket.emit('list_rooms');
   } else {
     console.log('[room-list] requestRoomList waiting for connect');
-    socket.once('connect', () => socket.emit('list_rooms'));
+    socket.once('connect', () => {
+      console.log('[room-list] connected, emitting list_rooms');
+      socket.emit('list_rooms');
+    });
   }
 }
 
