@@ -5,7 +5,7 @@
 module.exports = {
   PORT: process.env.PORT ? Number(process.env.PORT) : 3000,
   HAND_SIZE: 8,
-  MAX_PLAYERS: 10,
+  MAX_PLAYERS: 20,
 
   // Reconnect handling: short "grace" window absorbs brief mobile network
   // hops without pausing the match; if the grace period expires the room
